@@ -1,0 +1,44 @@
+<!-- sign_up.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<body>
+    <h1>Simulate Login</h1>
+    <form id="login-form">
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+            <label for="id_token">ID Token:</label>
+            <input type="text" id="id_token" name="id_token" required>
+        </div>
+        <button type="submit">Simulate Login</button>
+    </form>
+
+    <script>
+        document.getElementById("login-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+
+            const email = document.getElementById("email").value;
+            const id_token = document.getElementById("id_token").value;
+
+            const data = {
+                email: email,
+                id_token: id_token
+            };
+
+            fetch('/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch(error => console.error(error));
+        });
+    </script>
+</body>
+{% endblock %}

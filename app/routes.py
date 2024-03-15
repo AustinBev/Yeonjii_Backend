@@ -1,21 +1,54 @@
 # routes.py
 from __future__ import print_function
-from flask import render_template, request, jsonify, session, Blueprint
-from app.models.OpenAI import OpenAI as OpenAIModel
-from app.extensions import redis_client
-import uuid
-from pdfminer.high_level import extract_text
-import io
-from app.models.pro_writing_aid import check_grammar
+from flask import render_template, request, jsonify, session, Blueprint # Flask module for handling HTTP requests and responses
+from app.models.OpenAI import OpenAI as OpenAIModel # Custom OpenAI model
+from app.extensions import redis_client # Redis client from extensions module
+import uuid # generates unique identifiers
+from pdfminer.high_level import extract_text # PDF extraction tool
+import io # Handles byte streams
+from firebase_admin import auth, credentials, initialize_app # Firebase admin SDK for auth and app initialization
+# from app.models.pro_writing_aid import check_grammar
+import json
+import os
 
+# Defines the main blueprint for routes
 main = Blueprint('main', __name__)
+# creates an instance of the OpenAI model
 open_ai_model = OpenAIModel()
 
+# Load the service account key from the environment variable
+service_account_key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
+if service_account_key_json:
+    service_account_info = json.loads(service_account_key_json)
+    cred = credentials.Certificate(service_account_info)
+    firebase_app = initialize_app(cred)
+else:
+    print("Firebase service account key not found in environment variables.")
+
+default_app = initialize_app
+
+# The route decorator defines the endpoint for the root URL
 @main.route('/')
 def home_page():
     gpt_model = open_ai_model.get_openai_model()
     print("GPT Model:", gpt_model) 
     return render_template('index.html', gpt_model=gpt_model)
+
+@main.route('/profile')
+def profile():
+    return render_template('profile.html')
+
+@main.route('/verify_token', methods=['POST'])
+def verify_token():
+    id_token = request.json.get('idToken')
+    try:
+        # check token against firebase Auth
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+
+        return jsonify({'success': True, 'uid': uid}), 200
+    except auth.AuthError as e:
+        return jsonify({'success': False, 'message': str(e)}), 401
 
 @main.route('/get_session_id', methods=['GET'])
 def get_session_id():
@@ -40,21 +73,21 @@ def generate_cover_letter():
         print(f"Error during cover letter generation: {e}")
         return jsonify(error='Internal server error'), 500
 
-@main.route('/check_grammar', methods=['POST'])
-def check_grammar_route():
-    data = request.get_json()
-    text = data.get('text')
+# @main.route('/check_grammar', methods=['POST'])
+# def check_grammar_route():
+#     data = request.get_json()
+#     text = data.get('text')
 
-    if not text:
-        return jsonify(error='No text provided'), 400
+#     if not text:
+#         return jsonify(error='No text provided'), 400
 
-    try:
-        # Assuming you have a method in your OpenAIModel for checking grammar
-        grammar_issues = check_grammar(text)
-        return jsonify(grammar_issues=grammar_issues)
-    except Exception as e:
-        print(f"Error checking grammar: {e}")
-        return jsonify(error='Internal error'), 500
+#     try:
+#         # Assuming you have a method in your OpenAIModel for checking grammar
+#         grammar_issues = check_grammar(text)
+#         return jsonify(grammar_issues=grammar_issues)
+#     except Exception as e:
+#         print(f"Error checking grammar: {e}")
+#         return jsonify(error='Internal error'), 500
     
 @main.route('/set_resume', methods=['POST'])
 def set_resume():
@@ -148,95 +181,3 @@ def set_story():
 @main.route('/wake_up')
 def wake_up():
     return 'Backend active', 200
-
-# @main.route('/set_job_url', methods=['POST'])
-# def set_job_url():
-#     data = request.get_json()
-#     job_url = data.get('job_url')
-#     session_id = data.get('session_id')
-#     print(job_url)
-#     if job_url and session_id:
-#         job_url_key = f"{session_id}_job_url"
-#         redis_client.setex(job_url_key, 900, job_url)
-#         return jsonify(message='Job URL saved successfully in Redis')
-#     else:
-#         return jsonify(error='No job URL or session ID provided'), 400
-    
-# @main.route('/extract_and_save', methods=['POST'])
-# def extract_and_save():
-#     data = request.get_json()
-#     session_id = data.get('session_id')
-
-#     if not session_id:
-#         return jsonify(error='Session ID not provided'), 400
-
-#     job_url_key = f"{session_id}_job_url"
-#     job_url = redis_client.get(job_url_key).decode('utf-8') if redis_client.get(job_url_key) else None
-
-#     if not job_url:
-#         return jsonify(error='Job URL not found in Redis'), 400
-
-#     message = open_ai_model.browse_and_extract(session_id, job_url)
-#     return jsonify(message=message)
-
-
-# @main.route('/scrape_and_save', methods=['POST'])
-# def scrape_and_save():
-#     data = request.get_json()
-#     url = data.get('url')
-#     session_id = data.get('session_id')
-
-#     if not url or not session_id:
-#         return jsonify(error="URL or Session ID not provided"), 400
-
-#     job_role, company, job_description = scrape_website(url)
-
-#     if job_role and company and job_description:
-#         # Save the scraped data to Redis
-#         redis_client.setex(f"{session_id}_job_role", 900, job_role)
-#         redis_client.setex(f"{session_id}_company", 900, company)
-#         redis_client.setex(f"{session_id}_job_description", 900, job_description)
-#         return jsonify(message="Data scraped and saved successfully")
-
-#     return jsonify(error="Failed to scrape data or save to Redis"), 500
-
-# @main.route('/browse_site', methods=['POST'])
-# def browse_site_route():
-#     data = request.get_json()
-#     session_id = data.get('session_id')
-#     job_url = data.get('job_url')
-
-#     if not session_id or not job_url:
-#         return jsonify(error='Session ID or Job URL not provided'), 400
-
-#     job_role, company, job_description = open_ai_model.browse_and_extract(job_url)
-
-#     # Save the extracted data to Redis
-#     redis_client.setex(f"{session_id}_job_role", 900, job_role)
-#     redis_client.setex(f"{session_id}_company", 900, company)
-#     redis_client.setex(f"{session_id}_job_description", 900, job_description)
-
-#     return jsonify(message='Data extracted and saved successfully')
-
-# @main.route('/send_message', methods=['POST'])
-# def handle_chat_message():
-#     data = request.get_json()
-#     user_message = data.get('message')
-#     session_id = data.get('session_id')
-#     if user_message and session_id:
-#         response = open_ai_model.get_ai_answer(user_message)
-#         return jsonify(response=response)
-#     else:
-#         return jsonify(error='No message provided'), 400
-
-# @main.route('/set_tone')
-# def set_tone():
-#     data = request.get_json()
-#     tone = data.get('tone')
-#     if tone:
-#         tone_key = f"{session['session_id']}_tone"
-#         redis_client.setex('tone', 1800, tone)
-#         return jsonify(message='tone saved successfully in Redis')
-#     else:
-#         return jsonify(error='No tone data provided'), 400
-    
