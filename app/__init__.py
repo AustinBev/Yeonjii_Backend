@@ -9,6 +9,7 @@ from app.models.OpenAI import OpenAI
 from app.authentication.routes import auth
 import redis
 from flask_migrate import Migrate
+from app.authentication.routes import auth_bp
 
 load_dotenv()
 
@@ -33,7 +34,7 @@ def create_app():
     # Register Blueprints
     from app.routes import main as main_blueprint
     # app.register_blueprint(site)
-    app.register_blueprint(auth)
+    app.register_blueprint(auth_bp)
     # app.register_blueprint(api)
     app.register_blueprint(main_blueprint)
 

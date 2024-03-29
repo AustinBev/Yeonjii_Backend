@@ -20,3 +20,4 @@ pytest_cache/
 .idea/
 docs/_build/
 .vscode
+service_account_key.json

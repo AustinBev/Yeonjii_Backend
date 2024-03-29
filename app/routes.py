@@ -16,14 +16,17 @@ main = Blueprint('main', __name__)
 # creates an instance of the OpenAI model
 open_ai_model = OpenAIModel()
 
-# Load the service account key from the environment variable
-service_account_key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
-if service_account_key_json:
-    service_account_info = json.loads(service_account_key_json)
+# Load the service account key from the file specified in the environment variable
+service_account_key_path = os.getenv('SERVICE_ACCOUNT_KEY_PATH')
+if service_account_key_path:
+    # Load the JSON key from the file
+    with open(service_account_key_path, 'r') as f:
+        service_account_info = json.load(f)
     cred = credentials.Certificate(service_account_info)
     firebase_app = initialize_app(cred)
 else:
-    print("Firebase service account key not found in environment variables.")
+    print("Firebase service account key path not found in environment variables.")
+
 
 default_app = initialize_app
 
